@@ -1,0 +1,143 @@
+<!doctype html>
+<meta charset="utf-8">
+<link rel="shortcut icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRFdHR0UFBQwsLCnZ2dCQkJ7+/vhoaG////U3R9JgAAAAh0Uk5T/////////wDeg71ZAAABrElEQVR42tyXgZKEIAiGwdR7/zc+QDT1FK3m2pmlbdtKPn/AtIUfww5HG5nVBqyb6n8f8FkF0nsmGBCweqftPiB5F//bCq4BgKyOP5A514YRIcISkHsfAcg/bihICXhXAZKBWo4/AzIEEJAV1CoaQCbk3nsArgArBeQP6h9NBfMQLICvFaQQ+Lcnq3MAOyFQazcCkD9GKwRqj5YC3K1CzsEohDnA1yG4g485iQy5XIURwK4CbihYVUEIaCkAowqDcXD5WYDvexZGOYC9+WAawrVn4XIS8dGUpjlgDjv0gEi2VYUFYDkO0AIsH6ZE8DdD8Fh6nwHEzCoUQJgC7BAeKvAaf7AApgJX2VSBUh4BplXQ/Mn+voLeYQbI5wYgPAXYOdgDXFUQOpsBXGf/CAhvKqgbj8wZJoPqCwDyck2GtfHy1k8ksmydG18rVegB3PQPQPzOzwjgdZfZuwfgvgJZ48rceIbQSmgAsqDGeIhDWkSBDpGHZKjeTvjIF9J5+nOSvuiu3KReZRWGci5C9BrEpg1Cq+CkR1VwOJUwVoAjBaG8B2RFdY+dSvH9FWAAf6hAHY0fB5IAAAAASUVORK5CYII=">
+<title>Error!!1</title>
+<style>
+  .hidden {
+    display: none;
+  }
+  a {
+    text-decoration: none;
+    font-weight: bold;
+    color: inherit;
+  }
+  .smaller {
+    font-size: 12px;
+  }
+  .sad {
+    width: 70px;
+  }
+  code {
+    font-family: 'Monaco', monospace;
+    font-size: .8em;
+    font-weight: bold;
+  }
+  html {
+    background: linear-gradient(rgba(255,255,255,0.3),rgba(255,255,255,0));
+    background-color: #e8ebef;
+    background-repeat: no-repeat;
+    font-family: 'Helvetica Neue', 'Arial', sans-serif;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    font-weight: 200;
+  }
+  .aside {
+    font-size: 12px;
+    float: right;
+    color: #666;
+    font-weight: bold;
+  }
+  body {
+    margin: 0 auto;
+    padding: 0;
+  }
+  h1 {
+    font-weight: 200;
+    font-size: 30px;
+    margin-bottom: 0;
+  }
+  p, li {
+    line-height: 1.4em;
+  }
+  li {
+    margin-bottom: 10px;
+  }
+  .build-error {
+    margin-top: 20px;
+  }
+  .exception,
+  pre {
+    background: #fff;
+    color: #333;
+    font-size: 14px;
+    margin: 0;
+    padding: 40px;
+    border-bottom: 1px solid #ddd;
+  }
+  .footnotes {
+    padding: 20px 40px;
+    max-width: 650px;
+  }
+  .traceback {
+    border-top: 1px solid #ddd;
+    margin-top: 10px;
+    font-size: 13px;
+    overflow: auto;
+    word-wrap: break-word;
+  }
+  a i {
+    display: inline-block;
+    height: 8px;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    margin-left: 5px;
+    width: 10px;
+    background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+Cjxzdmcgd2lkdGg9IjE4cHgiIGhlaWdodD0iMTJweCIgdmlld0JveD0iMCAwIDE4IDEyIiB2ZXJzaW9uPSIxLjEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiPgogICAgPCEtLSBHZW5lcmF0b3I6IFNrZXRjaCAzLjYuMSAoMjYzMTMpIC0gaHR0cDovL3d3dy5ib2hlbWlhbmNvZGluZy5jb20vc2tldGNoIC0tPgogICAgPHRpdGxlPlNoYXBlPC90aXRsZT4KICAgIDxkZXNjPkNyZWF0ZWQgd2l0aCBTa2V0Y2guPC9kZXNjPgogICAgPGRlZnM+PC9kZWZzPgogICAgPGcgaWQ9IlBhZ2UtMSIgc3Ryb2tlPSJub25lIiBzdHJva2Utd2lkdGg9IjEiIGZpbGw9Im5vbmUiIGZpbGwtcnVsZT0iZXZlbm9kZCI+CiAgICAgICAgPGcgaWQ9Ik91ci1UZWNobm9sb2d5LShEYXduKSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTU5MS4wMDAwMDAsIC0xNDA2LjAwMDAwMCkiIGZpbGw9IiMwMDAwMDAiPgogICAgICAgICAgICA8ZyBpZD0iQnVpbGRpbmctb3VyLXBsYW5lIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxMzAuMDAwMDAwLCAxMDMwLjAwMDAwMCkiPgogICAgICAgICAgICAgICAgPGcgaWQ9Im1vcmUtKG5hdmlnYXRpb24pIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSg0NzAuMDAwMDAwLCAzODIuMDAwMDAwKSByb3RhdGUoLTI3MC4wMDAwMDApIHRyYW5zbGF0ZSgtNDcwLjAwMDAwMCwgLTM4Mi4wMDAwMDApIHRyYW5zbGF0ZSg0NTIuMDAwMDAwLCAzNjQuMDAwMDAwKSI+CiAgICAgICAgICAgICAgICAgICAgPGcgaWQ9Ikdyb3VwIj4KICAgICAgICAgICAgICAgICAgICAgICAgPHBhdGggZD0iTTE1LDkgTDEyLjg4NSwxMS4xMTUgTDE5Ljc1NSwxOCBMMTIuODg1LDI0Ljg4NSBMMTUsMjcgTDI0LDE4IEwxNSw5IFoiIGlkPSJTaGFwZSI+PC9wYXRoPgogICAgICAgICAgICAgICAgICAgIDwvZz4KICAgICAgICAgICAgICAgIDwvZz4KICAgICAgICAgICAgPC9nPgogICAgICAgIDwvZz4KICAgIDwvZz4KPC9zdmc+);
+  }
+  hr {
+    border: 1px solid #ddd;
+    margin: 30px 0;
+  }
+  header {
+    padding: 40px;
+    border-bottom: 1px solid #ddd;
+    position: relative;
+  }
+</style>
+<body>
+<header>
+<a class="aside" href="/_grow">{{pod.root}}</a>
+
+<img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAxOS4xLjAsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgeD0iMHB4IiB5PSIwcHgiDQoJIHZpZXdCb3g9IjAgMCA2NS44IDc3IiBzdHlsZT0iZW5hYmxlLWJhY2tncm91bmQ6bmV3IDAgMCA2NS44IDc3OyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7ZmlsbDojRkZGRkZGO30NCgkuc3Qxe2ZpbGw6I0M2QzZDNTt9DQoJLnN0MntmaWxsOiNDNEM0QzM7fQ0KCS5zdDN7ZmlsbDpub25lO3N0cm9rZTojMDAwMDAwO3N0cm9rZS13aWR0aDoyO3N0cm9rZS1saW5lY2FwOnJvdW5kO3N0cm9rZS1taXRlcmxpbWl0OjEwO30NCjwvc3R5bGU+DQo8Zz4NCgk8Zz4NCgkJPGc+DQoJCQk8Zz4NCgkJCQk8cG9seWdvbiBjbGFzcz0ic3QwIiBwb2ludHM9IjEuOCw3My4xIDEuOCwxNC45IDE0LjksMS43IDYxLjgsMS43IDYxLjgsNzMuMSAJCQkJIi8+DQoJCQkJPHBhdGggY2xhc3M9InN0MSIgZD0iTTYxLjUsMnY3MC45SDJWMTVMMTUsMkg2MS41IE02MiwxLjVoLTAuNUgxNWgtMC4ybC0wLjEsMC4xbC0xMywxM2wtMC4xLDAuMVYxNXY1Ny44djAuNUgyaDU5LjVINjJ2LTAuNVYyDQoJCQkJCVYxLjVMNjIsMS41eiIvPg0KCQkJPC9nPg0KCQk8L2c+DQoJPC9nPg0KCTxwb2x5Z29uIGNsYXNzPSJzdDIiIHBvaW50cz0iMTUsMiAyLDE1IDE1LDE1IAkiLz4NCgk8Y2lyY2xlIGN4PSIxOS44IiBjeT0iMjguNCIgcj0iMy41Ii8+DQoJPGNpcmNsZSBjeD0iNDMuOCIgY3k9IjI4LjQiIHI9IjMuNSIvPg0KCTxwYXRoIGNsYXNzPSJzdDMiIGQ9Ik00Ny4zLDQ4Yy0xLjctNS44LTcuNi0xMC4xLTE0LjYtMTAuMVMxOS44LDQyLjIsMTguMSw0OCIvPg0KPC9nPg0KPC9zdmc+DQo=" class="sad">
+
+<h1>Something went wrong while building this page.</h1>
+</header>
+<div class="exception">
+  {% if build_error %}
+    <div>An error occurred building <b>{{exception.controller}}</b></div>
+    <div class="build-error">{{build_error}}</div>
+  {% else %}
+    <span>{{exception}}</span>
+  {% endif %}
+  {% if template_exception %}
+    <hr>
+    <div>We think the problem is with <b>line {{template_exception.lineno}}</b> of <b>{{template_exception.filename}}</b>.</div>
+  {% endif %}
+</div>
+<div class="footnotes">
+{% if status == 404 %}
+  <p>No resource matches the requested path. Here's what you can do:</p>
+  <ul>
+    <li>If requesting a rendered page, ensure all path configurations in content documents, blueprints, and the podspec are correct.
+    <li>If requesting an asset, the file corresponding to this route could not be found. Ensure the file exists or check the directory configuration in the podspec.
+  </ul>
+  {% if home_url %}
+    <p>You can also go to the <a href="{{home_url}}">homepage</a> or <a href="/_grow">see all routes</a>.</p>
+  {% else %}
+    <p>You can also <a href="/_grow">see all routes</a>.</p>
+  {% endif %}
+{% else %}
+  <p>This page failed to render. Here's what you can do:
+  <ul>
+    <li>Check the view, document, blueprint, or podspec for syntax errors.
+  </ul>
+  {% if not is_web_exception %}
+  <a href="javascript:document.getElementById('traceback').classList.toggle('hidden')">Traceback<i></i></a>
+  {% endif %}
+{% endif %}
+</div>
+
+{% if not is_web_exception %}
+<pre id="traceback" class="smaller traceback hidden">{{traceback}}</pre>
+{% endif %}

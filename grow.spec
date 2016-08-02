@@ -3,7 +3,12 @@
 import os
 import glob
 import sys
-from PyInstaller.hooks.hookutils import collect_submodules
+try:
+    # PyInstaller==3.1
+    from PyInstaller.utils.hooks import collect_submodules
+except:
+    # PyInstaller==2.1.1
+    from PyInstaller.hooks.hookutils import collect_submodules
 
 
 IS_DARWIN = sys.platform == 'darwin'
@@ -32,6 +37,7 @@ else:
 
 
 hiddenimports += [
+    'babel.dates',
     'babel.numbers',
     'babel.plural',
     'keyring',
@@ -80,13 +86,18 @@ hiddenimports += [
     'werkzeug.wsgi',
 ]
 
+try:
+  hiddenimports += collect_submodules('pkg_resources._vendor')
+except AssertionError:
+  pass  # Environment doesn't need this to be collected.
 
 a = Analysis([
                 'bin/grow',
              ],
              pathex=[
-                '.',
+                # Longer paths precede shorter paths for path-stripping.
                 './env/lib/python2.7/site-packages/',
+                '.',
              ],
              hiddenimports=hiddenimports,
              hookspath=None,
@@ -96,9 +107,11 @@ a = Analysis([
 a.datas += [
     ('VERSION', 'grow/VERSION', 'DATA'),
     ('data/cacerts.txt', 'grow/data/cacerts.txt', 'DATA'),
+    ('httplib2/cacerts.txt', 'grow/data/cacerts.txt', 'DATA'),
 ]
-a.datas += glob_datas('grow/server/frontend')
-a.datas += glob_datas('grow/server/templates')
+a.datas += glob_datas('grow/ui/assets')
+a.datas += glob_datas('grow/ui/dist')
+a.datas += glob_datas('grow/ui/templates')
 a.datas += glob_datas('grow/pods/templates')
 
 

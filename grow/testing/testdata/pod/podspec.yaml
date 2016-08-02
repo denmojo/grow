@@ -5,14 +5,24 @@ root: /root/
 flags:
   static_dir: /public/
 
+sitemap:
+  enabled: true
+
 static_dirs:
+- static_dir: /static-fingerprint/
+  serve_at: "/{root}/static-fingerprint/{fingerprint}/"
+  localization:
+    static_dir: /static-fingerprint/intl/{locale}/
+    serve_at: /{root}/static-fingerprint/{fingerprint}/{locale}/
 - static_dir: /static-root/
   serve_at: "/{root}/static/"
+  fingerprinted: true
 - static_dir: /static/
   serve_at: /app/static/
+  fingerprinted: true
   localization:
     static_dir: /static/intl/{locale}/
-    serve_at: /app/static/somepath/{locale}/
+    serve_at: /app/{root}/static/somepath/{locale}/
 
 localization:
   default_locale: en
@@ -31,6 +41,16 @@ localization:
     de_DE:
     - de
 
+translators:
+  project_title: "Test Grow Project"
+  instructions: >-
+      Instructions regarding translating the project.
+  services:
+  - service: google_translator_toolkit
+    acl:
+    - email: user@example.com
+  - service: custom_translator
+
 deployments:
   gcs:
     destination: gcs
@@ -45,3 +65,16 @@ deployments:
     destination: scp
     host: localhost
     root_dir: dist/
+
+preprocessors:
+- name: custom
+  kind: custom_preprocessor
+  value: testing123
+
+extensions:
+  jinja2:
+  - extensions.triplicate.Triplicate
+  preprocessors:
+  - extensions.preprocessors.CustomPreprocessor
+  translators:
+  - extensions.translators.CustomTranslator

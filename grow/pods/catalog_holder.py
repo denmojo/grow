@@ -5,15 +5,14 @@ from babel import util as babel_util
 from babel.messages import catalog
 from babel.messages import catalog as babel_catalog
 from babel.messages import extract
-from babel.messages import mofile
 from babel.messages import pofile
 from grow.common import utils
 from grow.pods import messages
-import cStringIO
 import click
 import collections
 import gettext
 import os
+import StringIO
 import tokenize
 
 
@@ -99,31 +98,13 @@ class Catalogs(object):
             message.catalogs.append(catalog.to_message())
         return message
 
-    def get_extract_config(self, include_obsolete=None, localized=None,
-            include_header=None, use_fuzzy_matching=None):
-        extract_config = self.pod.yaml.get('localization', {}).get('extract', {})
-        if include_obsolete is None:
-            include_obsolete = extract_config.get('include_obsolete', False)
-        if localized is None:
-            localized = extract_config.get('localized', False)
-        if include_header is None:
-            include_header = extract_config.get('include_header', False)
-        if use_fuzzy_matching is None:
-            use_fuzzy_matching = extract_config.get('fuzzy_matching', False)
-        return include_obsolete, localized, include_header, use_fuzzy_matching
-
-    def init(self, locales, include_header=None):
-        _, _, include_header, _ = \
-            self.get_extract_config(include_header=include_header)
+    def init(self, locales, include_header=False):
         for locale in locales:
             catalog = self.get(locale)
             catalog.init(template_path=self.template_path,
                          include_header=include_header)
 
-    def update(self, locales, use_fuzzy_matching=None, include_header=None):
-        _, _, include_header, use_fuzzy_matching = \
-            self.get_extract_config(include_header=include_header,
-                use_fuzzy_matching=use_fuzzy_matching)
+    def update(self, locales, use_fuzzy_matching=False, include_header=False):
         for locale in locales:
             catalog = self.get(locale)
             self.pod.logger.info('Updating: {}'.format(locale))
@@ -166,14 +147,10 @@ class Catalogs(object):
             return False
         return not given_paths or path in given_paths
 
-    def extract(self, include_obsolete=None, localized=None, paths=None,
-                include_header=None, locales=None, use_fuzzy_matching=None):
-        include_obsolete, localized, include_header, use_fuzzy_matching, = \
-            self.get_extract_config(include_header=include_header,
-                include_obsolete=include_obsolete, localized=localized,
-                use_fuzzy_matching=use_fuzzy_matching)
-
+    def extract(self, include_obsolete=False, localized=False, paths=None,
+                include_header=False, locales=None, use_fuzzy_matching=False):
         env = self.pod.get_jinja_env()
+
         # {
         #    locale1: locale1_catalog,
         #    locale2: locale2_catalog,
@@ -221,8 +198,8 @@ class Catalogs(object):
                 None,
                 auto_comments=auto_comments,
                 locations=[(path, 0)])
-            if msgid:
-                _add_to_catalog(message, locales)
+
+            _add_to_catalog(message, locales)
 
         def _babel_extract(fp, locales, path):
             try:
@@ -290,7 +267,7 @@ class Catalogs(object):
 
                 # Extract body: {{_('Extract me')}}
                 if doc.body:
-                    doc_body = cStringIO.StringIO(doc.body.encode('utf-8'))
+                    doc_body = StringIO.StringIO(doc.body.encode('utf-8'))
                     _babel_extract(doc_body, doc_locales, doc.pod_path)
 
             # Extract from CSVs for this collection's locales
@@ -317,8 +294,6 @@ class Catalogs(object):
         # Not discriminating by file extension, because people use all sorts
         # (htm, html, tpl, dtml, jtml, ...)
         for path in self.pod.list_dir('/views/'):
-            if path.startswith('.'):
-                continue
             pod_path = os.path.join('/views/', path)
             self.pod.logger.info('Extracting: {}'.format(pod_path))
             with self.pod.open_file(pod_path) as f:
@@ -391,18 +366,6 @@ class Catalogs(object):
 
     def clear_gettext_cache(self):
         self._gettext_translations = {}
-
-    def inject_translations(self, locale, content):
-        po_file_to_merge = cStringIO.StringIO()
-        po_file_to_merge.write(content)
-        po_file_to_merge.seek(0)
-        catalog_to_merge = pofile.read_po(po_file_to_merge, locale)
-        mo_fp = cStringIO.StringIO()
-        mofile.write_mo(mo_fp, catalog_to_merge)
-        mo_fp.seek(0)
-        translation_obj = support.Translations(mo_fp, domain='messages')
-        self._gettext_translations[locale] = translation_obj
-        self.pod.logger.info('Injected translations -> {}'.format(locale))
 
     def get_gettext_translations(self, locale):
         if locale in self._gettext_translations:

@@ -20,9 +20,6 @@ class RenderedController(controllers.BaseController):
     def __repr__(self):
         if not self.doc:
             return '<Rendered(view=\'{}\')>'.format(self.view)
-        if self.doc.locale:
-            return '<Rendered(view=\'{}\', doc=\'{}\', locale=\'{}\')>'.format(
-                self.view, self.doc.pod_path, str(self.doc.locale))
         return '<Rendered(view=\'{}\', doc=\'{}\')>'.format(
             self.view, self.doc.pod_path)
 
@@ -42,10 +39,8 @@ class RenderedController(controllers.BaseController):
 
     def render(self, params, inject=True):
         preprocessor = None
-        translator = None
         if inject:
             preprocessor = self.pod.inject_preprocessors(doc=self.doc)
-            translator = self.pod.inject_translators(doc=self.doc)
         env = self.pod.get_jinja_env(self.locale)
         template = env.get_template(self.view.lstrip('/'))
         try:
@@ -55,7 +50,7 @@ class RenderedController(controllers.BaseController):
                 'podspec': self.pod.get_podspec(),
             }
             content = template.render(kwargs).lstrip()
-            content = self._inject_ui(content, preprocessor, translator)
+            content = self._inject_ui(content, preprocessor)
             return content
         except Exception as e:
             text = 'Error building {}: {}'
@@ -65,9 +60,8 @@ class RenderedController(controllers.BaseController):
             exception.exception = e
             raise exception
 
-    def _inject_ui(self, content, preprocessor, translator):
-        show_ui = (self.pod.env.name == env.Name.DEV
-                   and (preprocessor or translator)
+    def _inject_ui(self, content, preprocessor):
+        show_ui = (self.pod.env.name == env.Name.DEV and preprocessor
                    and self.get_mimetype().endswith('html'))
         if show_ui:
             jinja_env = ui.create_jinja_env()
@@ -75,6 +69,5 @@ class RenderedController(controllers.BaseController):
             content += '\n' + ui_template.render({
                 'doc': self.doc,
                 'preprocessor': preprocessor,
-                'translator': translator,
             })
         return content

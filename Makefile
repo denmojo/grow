@@ -15,6 +15,8 @@ export PATH := $(HOME)/go/bin/:$(PATH)
 target ?= 'grow/'
 
 develop:
+	virtualenv env --distribute
+	. env/bin/activate
 	@pip --version > /dev/null || { \
 	  echo "pip not installed. Trying to install pip..."; \
 	  sudo easy_install pip; \
@@ -23,8 +25,6 @@ develop:
 	  echo "virtualenv not installed. Trying to install virtualenv..."; \
 	  sudo pip install virtualenv; \
 	}
-	virtualenv env --distribute
-	. env/bin/activate
 	@echo "Trying to install libyaml..."
 	@if [ $(BREW) ]; then \
 	  brew install libyaml || { \
@@ -47,7 +47,6 @@ build-ui:
 	    sudo apt-get -f install -y --no-install-recommends nodejs-legacy npm; \
 	  else \
 	    echo "npm not installed. You must install npm."; \
-	    echo "Try installing via nvm: https://github.com/creationix/nvm" \
 	    exit 1; \
 	  fi \
 	}
@@ -161,15 +160,9 @@ upload-github:
 	  -n "$(FILENAME)" \
 	  --file dist/$(FILENAME)
 
-# https://github.com/grow/grow/issues/302
-setup-release:
-	make develop
-	. env/bin/activate
-	./env/bin/pip install git+https://github.com/pyinstaller/pyinstaller.git\#b78bfe530cdc2904f65ce098bdf2de08c9037abb
-
 release:
 	. env/bin/activate
-	./env/bin/pyinstaller grow.spec
+	pyinstaller grow.spec
 	chmod +x dist/grow
 	cd dist && zip -r $(FILENAME) grow && cd ..
 	./dist/grow

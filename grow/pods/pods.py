@@ -14,7 +14,6 @@ from ..preprocessors import preprocessors
 from ..translators import translators
 from grow.common import sdk_utils
 from grow.common import utils
-from grow.deployments import deployments
 from werkzeug.contrib import cache as werkzeug_cache
 import copy
 import jinja2
@@ -51,6 +50,7 @@ class PodSpecParseError(Error):
 class Pod(object):
 
     def __init__(self, root, storage=storage.auto, env=None):
+        self.virtual_files = {}
         self.storage = storage
         self.root = (root if self.storage.is_cloud_storage
                      else os.path.abspath(root))
@@ -211,8 +211,14 @@ class Pod(object):
         if not collection_path or not unused_path:
             text = '"{}" is not a path to a document.'.format(pod_path)
             raise collection.BadCollectionNameError(text)
-        collection = self.get_collection(collection_path)
-        return collection.get_doc(pod_path, locale=locale)
+        original_collection_path = collection_path
+        col = self.get_collection(collection_path)
+        while not col.exists:
+            col = col.parent
+            if not col:
+                col = self.get_collection(original_collection_path)
+                break
+        return col.get_doc(pod_path, locale=locale)
 
     def get_home_doc(self):
         home = self.yaml.get('home')
@@ -302,6 +308,8 @@ class Pod(object):
 
     def get_deployment(self, nickname):
         """Returns a pod-specific deployment."""
+        # Lazy import avoids environment errors and speeds up importing.
+        from grow.deployments import deployments
         if 'deployments' not in self.yaml:
             raise ValueError('No pod-specific deployments configured.')
         destination_configs = self.yaml['deployments']
@@ -324,13 +332,15 @@ class Pod(object):
         codes = self.yaml.get('localization', {}).get('locales', [])
         return locales.Locale.parse_codes(codes)
 
+    @utils.memoize
     def get_translator(self, service=utils.SENTINEL):
         if 'translators' not in self.yaml:
-            raise ValueError('No translators configured.')
+            return None
         if ('services' not in self.yaml['translators']
                 or not self.yaml['translators']['services']):
-            raise ValueError('No translator services configured.')
+            return None
         translator_config = self.yaml['translators']
+        inject_name = translator_config.get('inject')
         translators.register_extensions(
             self.yaml.get('extensions', {}).get('translators', []),
             self.root,
@@ -346,15 +356,15 @@ class Pod(object):
                 keys = ', '.join(valid_service_kinds)
                 raise ValueError(text.format(service, keys))
         else:
-            if len(translator_services) > 1:
-                text = ('Must specify a translator name if more than one'
-                        ' translator service is configured.')
-                raise ValueError(text)
+            # Use the first configured translator by default.
+            translator_services = translator_services[:1]
         for service_config in translator_services:
             if service_config.get('service') == service or len(translator_services) == 1:
                 translator_kind = service_config.pop('service')
+                inject = inject_name == translator_kind
                 return translators.create_translator(
                     self, translator_kind, service_config,
+                    inject=inject,
                     project_title=translator_config.get('project_title'),
                     instructions=translator_config.get('instructions'))
         raise ValueError('No translator service found: {}'.format(service))
@@ -372,6 +382,13 @@ class Pod(object):
             preprocessor = preprocessors.make_preprocessor(kind, params, self)
             results.append(preprocessor)
         return results
+
+    def inject_translators(self, doc):
+        translator = self.get_translator()
+        if not translator:
+            return
+        translator.inject(doc=doc)
+        return translator
 
     def inject_preprocessors(self, doc=None, collection=None):
         """Conditionally injects or creates data from preprocessors. If a doc
@@ -408,8 +425,13 @@ class Pod(object):
 
     @utils.memoize
     def _get_bytecode_cache(self):
-        client = werkzeug_cache.SimpleCache()
-        return jinja2.MemcachedBytecodeCache(client=client)
+        return jinja2.MemcachedBytecodeCache(client=self.cache)
+
+    @utils.cached_property
+    def cache(self):
+        if utils.is_appengine():
+            return werkzeug_cache.MemcachedCache(default_timeout=0)
+        return werkzeug_cache.SimpleCache(default_timeout=0)
 
     def list_jinja_extensions(self):
         extensions = []
@@ -476,6 +498,9 @@ class Pod(object):
         return utils.untag_fields(fields)
 
     def write_yaml(self, path, content):
+        for virtual_key in self.virtual_files.keys():
+            if path in virtual_key:
+                del self.virtual_files[virtual_key]
         content = utils.dump_yaml(content)
         self.write_file(path, content)
 

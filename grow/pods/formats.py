@@ -7,7 +7,6 @@
 from grow.common import markdown_extensions
 from grow.common import utils
 from markdown.extensions import tables
-from markdown.extensions import toc
 import collections
 import logging
 import markdown
@@ -28,21 +27,26 @@ class BadFormatError(Error, ValueError):
     pass
 
 
+class BadLocalesError(BadFormatError):
+    pass
+
+
 class Format(object):
 
     def __init__(self, doc):
         self.doc = doc
-        self.pod = doc.pod
         self.body = None
         self.pod_path = self.doc.pod_path
-        self.root_pod_path = self.pod_path
-        self.locale_from_path = None
-        self.content = self._init_content(self.pod_path)
+        self.content = self._init_content()
         self._has_front_matter = Format.has_front_matter(self.content)
         self._locales_from_base = []
         self._locales_from_parts = []
         self.fields = {}
+        if self._load_existing():
+            return
+
         self.load()
+        self._add_to_pod()
 
     @staticmethod
     def _normalize_frontmatter(pod_path, content, locale=None):
@@ -84,25 +88,44 @@ class Format(object):
         base, ext = os.path.splitext(pod_path)
         return '{}@{}{}'.format(base, locale, ext)
 
-    def _init_content(self, pod_path):
+    def _init_content(self):
         self.root_pod_path, self.locale_from_path = \
-            Format.parse_localized_path(pod_path)
+            Format.parse_localized_path(self.pod_path)
         if self.locale_from_path:
-            if self.pod.file_exists(self.root_pod_path):
-                root_content = self.pod.read_file(self.root_pod_path)
+            if self.doc.pod.file_exists(self.root_pod_path):
+                root_content = self.doc.pod.read_file(self.root_pod_path)
             else:
                 root_content = ''
-            localized_content = self.pod.read_file(pod_path)
+            localized_content = self.doc.pod.read_file(self.pod_path)
             root_content_with_frontmatter = Format._normalize_frontmatter(
                 self.root_pod_path, root_content)
             localized_content_with_frontmatter = Format._normalize_frontmatter(
-                pod_path, localized_content, locale=self.locale_from_path)
+                self.pod_path, localized_content, locale=self.locale_from_path)
             return '{}\n{}'.format(
                 root_content_with_frontmatter,
                 localized_content_with_frontmatter)
-        if self.pod.file_exists(pod_path):
-            return self.pod.read_file(pod_path)
+        if self.doc.pod.file_exists(self.pod_path):
+            return self.doc.pod.read_file(self.pod_path)
         return ''
+
+    def _load_existing(self):
+        if self.doc.virtual_key in self.doc.pod.virtual_files:
+            self.fields, \
+            self.body, \
+            self._has_front_matter, \
+            self._locales_from_base, \
+            self._locales_from_parts = \
+                self.doc.pod.virtual_files[self.doc.virtual_key]
+            return True
+        return False
+
+    def _add_to_pod(self):
+        self.doc.pod.virtual_files[self.doc.virtual_key] = \
+            (self.fields,
+             self.body,
+             self._has_front_matter,
+             self._locales_from_base,
+             self._locales_from_parts)
 
     @classmethod
     def get(cls, doc):
@@ -162,7 +185,7 @@ class _SplitDocumentFormat(Format):
     def _validate_fields(self, fields):
         if '$locale' in fields and '$locales' in fields:
             text = 'You must specify either $locale or $locales, not both.'
-            raise BadFormatError(text)
+            raise BadLocalesError(text)
 
     def _validate_base_part(self, fields):
         self._validate_fields(fields)
@@ -172,12 +195,7 @@ class _SplitDocumentFormat(Format):
         # (otherwise there's no point)
         if '$locale' not in fields and '$locales' not in fields:
             text = 'You must specify either $locale or $locales for each document part.'
-            raise BadFormatError(text)
-        invalid_locales = set(self._locales_from_parts) - set(self._locales_from_base + self.doc.collection.locales)
-        if invalid_locales:
-            text = ('You must specify $locales in either the base '
-                    'part of the document or in the blueprint.')
-            raise BadFormatError(text)
+            raise BadLocalesError(text)
         self._validate_fields(fields)
 
     def _get_locales_of_part(self, fields):
@@ -190,6 +208,7 @@ class _SplitDocumentFormat(Format):
         if '$localization' in fields:
             if 'default_locale' in fields['$localization']:
                 return fields['$localization']['default_locale']
+        return self.doc.collection.default_locale
 
     def _load_yaml(self, part):
         try:
@@ -244,21 +263,21 @@ class YamlFormat(_SplitDocumentFormat):
 
     def load(self):
         try:
-            if not self._has_front_matter:
+            if self._has_front_matter:
+                self._handle_pairs_of_parts_and_bodies()
+            else:
+                self.body = self.content
                 self.fields = utils.load_yaml(
                     self.content,
                     doc=self.doc,
                     pod=self.doc.pod) or {}
-                self.body = self.content
-                return
-            self._handle_pairs_of_parts_and_bodies()
         except (yaml.composer.ComposerError, yaml.scanner.ScannerError) as e:
             message = 'Error parsing {}: {}'.format(self.doc.pod_path, e)
             logging.exception(message)
             raise BadFormatError(message)
 
 
-class HtmlFormat(YamlFormat):
+class HtmlFormat(_SplitDocumentFormat):
 
     def _iterate_content(self):
         pairs = utils.every_two(Format.split_front_matter(self.content))
@@ -285,7 +304,7 @@ class MarkdownFormat(HtmlFormat):
         if val is not None:
             extensions = [
                 tables.TableExtension(),
-                toc.TocExtension(),
+                markdown_extensions.TocExtension(pod=self.doc.pod),
                 markdown_extensions.CodeBlockExtension(self.doc.pod),
                 markdown_extensions.IncludeExtension(self.doc.pod),
                 markdown_extensions.UrlExtension(self.doc.pod),

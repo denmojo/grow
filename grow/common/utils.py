@@ -6,6 +6,7 @@ except ImportError:
         import StringIO
     except ImportError:
         from io import StringIO
+from boltons import iterutils
 import bs4
 import csv as csv_lib
 import functools
@@ -16,11 +17,11 @@ import json
 import logging
 import os
 import re
-import urllib
 import sys
 import threading
 import time
 import translitcodec
+import urllib
 import yaml
 
 # The CLoader implementation of the PyYaml loader is orders of magnitutde
@@ -33,7 +34,9 @@ except ImportError:
     from yaml import Loader as yaml_Loader
 
 
+LOCALIZED_KEY_REGEX = re.compile('(.*)@([\w|-]+)$')
 SENTINEL = object()
+SLUG_REGEX = re.compile(r'[\t !"#$%&\'()*\-/<=>?@\[\\\]^_`{|},.]+')
 
 
 class Error(Exception):
@@ -219,7 +222,7 @@ def make_yaml_loader(pod, doc=None):
             return self._construct_func(node, pod.read_csv)
 
         def construct_doc(self, node):
-            locale = doc.locale if doc else None
+            locale = doc._locale_kwarg if doc else None
             func = lambda path: pod.get_doc(path, locale=locale)
             return self._construct_func(node, func)
 
@@ -230,12 +233,12 @@ def make_yaml_loader(pod, doc=None):
             return self._construct_func(node, pod.read_json)
 
         def construct_static(self, node):
-            locale = doc.locale if doc else None
+            locale = doc._locale_kwarg if doc else None
             func = lambda path: pod.get_static(path, locale=locale)
             return self._construct_func(node, func)
 
         def construct_url(self, node):
-            locale = doc.locale if doc else None
+            locale = doc._locale_kwarg if doc else None
             func = lambda path: pod.get_url(path, locale=locale)
             return self._construct_func(node, func)
 
@@ -269,12 +272,11 @@ def dump_yaml(obj):
         obj, allow_unicode=True, width=800, default_flow_style=False)
 
 
-_slug_re = re.compile(r'[\t !"#$%&\'()*\-/<=>?@\[\\\]^_`{|},.]+')
 def slugify(text, delim=u'-'):
     if not isinstance(text, basestring):
         text = str(text)
     result = []
-    for word in _slug_re.split(text.lower()):
+    for word in SLUG_REGEX.split(text.lower()):
         word = word.encode('translit/long')
         if word:
             result.append(word)
@@ -296,30 +298,50 @@ class JsonEncoder(json.JSONEncoder):
 
 
 @memoize
-def untag_fields(fields):
+def untag_fields(fields, locale=None):
     """Untags fields, handling translation priority."""
-    untagged_keys_to_add = {}
-    nodes_and_keys_to_add = []
-    nodes_and_keys_to_remove = []
-    def callback(item, key, node):
+
+    updated_localized_paths = set()
+    paths_to_keep_tagged = set()
+
+    def visit(path, key, value):
         if not isinstance(key, basestring):
-            return
+            return key, value
+        if (path, key.rstrip('@')) in updated_localized_paths:
+            return False
         if key.endswith('@#'):
-            nodes_and_keys_to_remove.append((node, key))
+            return False
         if key.endswith('@'):
-            untagged_key = key.rstrip('@')
-            content = item
-            nodes_and_keys_to_remove.append((node, key))
-            untagged_keys_to_add[untagged_key] = True
-            nodes_and_keys_to_add.append((node, untagged_key, content))
-    walk(fields, callback)
-    for node, key in nodes_and_keys_to_remove:
-        if isinstance(node, dict):
-            del node[key]
-    for node, untagged_key, content in nodes_and_keys_to_add:
-        if isinstance(node, dict):
-            node[untagged_key] = content
-    return fields
+            if isinstance(value, list):
+                paths_to_keep_tagged.add((path, key))
+            key = key[:-1]
+        match = LOCALIZED_KEY_REGEX.match(key)
+        if not match:
+            updated_localized_paths.add((path, key))
+            return key, value
+        untagged_key, locale_from_key = match.groups()
+        if locale_from_key != locale:
+            return False
+        updated_localized_paths.add((path, untagged_key.rstrip('@')))
+        return untagged_key, value
+
+    # Backwards compatibility for https://github.com/grow/grow/issues/95
+    def exit(path, key, old_parent, new_parent, new_items):
+        resp = iterutils.default_exit(path, key, old_parent,
+                                      new_parent, new_items)
+        if paths_to_keep_tagged and isinstance(resp, dict):
+            for sub_key, value in resp.items():
+                if not isinstance(value, list):
+                    continue
+                new_key = '{}@'.format(sub_key)
+                resp[new_key] = value
+            try:
+                paths_to_keep_tagged.remove((path, key))
+            except KeyError:
+                pass
+        return resp
+
+    return iterutils.remap(fields, visit=visit, exit=exit)
 
 
 def LocaleIterator(iterator, locale):
@@ -375,6 +397,7 @@ class ProgressBarThread(threading.Thread):
 def clean_html(content, convert_to_markdown=False):
     soup = bs4.BeautifulSoup(content, 'html.parser')
     _process_google_hrefs(soup)
+    _process_google_comments(soup)
     # Support HTML fragments without body tags.
     content = unicode(soup.body or soup)
     if convert_to_markdown:
@@ -387,6 +410,18 @@ def _process_google_hrefs(soup):
     for tag in soup.find_all('a'):
         if tag.attrs.get('href'):
             tag['href'] = _clean_google_href(tag['href'])
+
+
+def _process_google_comments(soup):
+    for el in soup.find_all('a'):
+        id_attribute = el.get('id')
+        if id_attribute and id_attribute.startswith(('cmnt', 'ftnt')):
+            footer_parent = el.find_parent('div')
+            if footer_parent:
+                footer_parent.decompose()
+            sup_parent = el.find_parent('sup')
+            if sup_parent:
+                sup_parent.decompose()
 
 
 def _clean_google_href(href):

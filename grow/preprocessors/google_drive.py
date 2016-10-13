@@ -26,6 +26,7 @@ import yaml
 
 
 OAUTH_SCOPE = 'https://www.googleapis.com/auth/drive'
+STORAGE_KEY = 'Grow SDK'
 
 
 # Silence extra logging from googleapiclient.
@@ -33,15 +34,14 @@ discovery.logger.setLevel(logging.WARNING)
 
 
 class BaseGooglePreprocessor(base.BasePreprocessor):
-    scheduleable = True
 
     @staticmethod
-    def create_service():
+    def create_service(api='drive', version='v2'):
         credentials = oauth.get_or_create_credentials(
             scope=OAUTH_SCOPE, storage_key='Grow SDK')
         http = httplib2.Http(ca_certs=utils.get_cacerts_path())
         http = credentials.authorize(http)
-        return discovery.build('drive', 'v2', http=http)
+        return discovery.build(api, version, http=http)
 
     def run(self, build=True):
         try:
@@ -185,6 +185,13 @@ class GoogleSheetsPreprocessor(BaseGooglePreprocessor):
                 logger.error(text)
                 if raise_errors:
                     raise base.PreprocessorError(text)
+            # Weak test to defend against critical errors while still
+            # permitting 404s. We may want to remove the "raise_errors = False"
+            # code path in its entirety in the future.
+            # https://github.com/grow/grow/issues/283
+            if content.startswith('<!DOCTYPE'):
+                text = 'Error downloading Google Sheet. Received: {}'
+                raise base.PreprocessorError(text.format(content))
             return content
         if raise_errors:
             text = 'No file to export from Google Sheets: {}'.format(path)
@@ -270,6 +277,14 @@ class GoogleSheetsPreprocessor(BaseGooglePreprocessor):
             return True
         return False
 
+    def _normalize_formatted_content(self, fields):
+        # A hack that sends fields through a roundtrip json serialization to
+        # avoid encoding issues with injected output from Google Sheets.
+        fp = cStringIO.StringIO()
+        json.dump(fields, fp)
+        fp.seek(0)
+        return json.load(fp)
+
     def inject(self, doc):
         path, key_to_update = self._parse_path(self.config.path)
         try:
@@ -286,6 +301,7 @@ class GoogleSheetsPreprocessor(BaseGooglePreprocessor):
             content, path=path, format_as=self.config.format,
             preserve=self.config.preserve, existing_data=existing_data,
             key_to_update=key_to_update)
+        fields = self._normalize_formatted_content(fields)
         fields = utils.untag_fields(fields)
         doc.inject(fields=fields)
 

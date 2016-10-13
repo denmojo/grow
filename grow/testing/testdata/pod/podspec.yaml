@@ -50,9 +50,6 @@ translators:
     acl:
     - email: user@example.com
   - service: custom_translator
-  - service: google_sheets
-    acl:
-    - user: hikingfan@gmail.com
 
 deployments:
   gcs:
@@ -76,7 +73,6 @@ preprocessors:
 
 extensions:
   jinja2:
-  - extensions.numbers.NumbersExtension
   - extensions.triplicate.Triplicate
   preprocessors:
   - extensions.preprocessors.CustomPreprocessor

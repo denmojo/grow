@@ -13,7 +13,6 @@ import urllib
 import urlparse
 
 
-VERSION = config.VERSION
 RELEASES_API = 'https://api.github.com/repos/grow/grow/releases'
 INSTALLER_COMMAND = ('/usr/bin/python -c "$(curl -fsSL '
                      'https://raw.github.com/grow/grow/master/install.py)"')
@@ -34,16 +33,13 @@ class LatestVersionCheckError(Error):
 
 
 def get_this_version():
-    return VERSION
+    return config.VERSION
 
 
 def get_latest_version():
     try:
         releases = json.loads(urllib.urlopen(RELEASES_API).read())
-        for release in releases:
-            if release['prerelease']:
-                continue
-            return release['tag_name']
+        return releases[0]['tag_name']
     except Exception as e:
         text = 'Cannot check for updates to the SDK while offline.'
         logging.error(colorize(text, ansi=198))
@@ -58,8 +54,7 @@ def check_sdk_version(pod):
     if (semantic_version.Version(sdk_version)
         not in semantic_version.Spec(requires_version)):
         text = 'ERROR! Pod requires Grow SDK version: {}'.format(requires_version)
-        logging.error(colorize(text, ansi=197))
-        raise LatestVersionCheckError(str(text))
+        raise LatestVersionCheckError(colorize(text, ansi=197))
 
 
 def check_for_sdk_updates(auto_update_prompt=False):

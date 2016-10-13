@@ -55,6 +55,7 @@ class Collection(object):
         self.collection_path = regex.sub('', pod_path).strip('/')
         self.pod_path = pod_path
         self.basename = os.path.basename(self.collection_path)
+        self._default_locale = _pod.podspec.default_locale
         self._blueprint_path = os.path.join(
             self.pod_path, Collection.BLUEPRINT_PATH)
 
@@ -83,17 +84,6 @@ class Collection(object):
     @property
     def tagged_fields(self):
         return copy.deepcopy(self.yaml)
-
-    @utils.cached_property
-    def default_locale(self):
-        if self.localization and 'default_locale' in self.localization:
-            locale = self.localization['default_locale']
-        else:
-            locale = self.pod.podspec.default_locale
-        locale = locales.Locale.parse(locale)
-        if locale:
-            locale.set_alias(self.pod)
-        return locale
 
     @classmethod
     def list(cls, pod):
@@ -205,31 +195,11 @@ class Collection(object):
     def path_format(self):
         return self._get_builtin_field('path')
 
-    @property
-    def parent(self):
-        parent_pod_path = os.path.normpath(self.pod_path[:-len(self.basename)])
-        if parent_pod_path == Collection.CONTENT_PATH:
-            return
-        return self.pod.get_collection(parent_pod_path)
-
     def delete(self):
         if len(self.list_docs(include_hidden=True)):
             text = 'Collections that are not empty cannot be deleted.'
             raise CollectionNotEmptyError(text)
         self.pod.delete_file(self._blueprint_path)
-
-    def _owns_doc_at_path(self, pod_path):
-        dir_name = os.path.dirname(pod_path)
-        doc_blueprint_path = os.path.join(dir_name, '_blueprint.yaml')
-        if doc_blueprint_path == self._blueprint_path:
-            return True
-        parts = pod_path.split(os.sep)
-        for i, part in enumerate(parts):
-            path = os.sep.join(parts[:-i])
-            doc_blueprint_path = os.path.join(path, '_blueprint.yaml')
-            if self.pod.file_exists(doc_blueprint_path):
-                return doc_blueprint_path == self._blueprint_path
-        return False
 
     def list_docs(self, order_by=None, locale=utils.SENTINEL, reverse=None,
                   include_hidden=False, recursive=True, inject=False):
@@ -245,9 +215,6 @@ class Collection(object):
             return reversed(sorted_docs) if reverse else sorted_docs
         for path in self.pod.list_dir(self.pod_path, recursive=recursive):
             pod_path = os.path.join(self.pod_path, path.lstrip('/'))
-            # Document is owned by a different collection, skip it.
-            if not self._owns_doc_at_path(pod_path):
-                continue
             slug, ext = os.path.splitext(os.path.basename(pod_path))
             if (slug.startswith('_')
                     or ext not in messages.extensions_to_formats
@@ -310,16 +277,21 @@ class Collection(object):
 
     @utils.cached_property
     def locales(self):
-        localized = ('$localization' in self.fields
-                     or 'localization' in self.fields)
-        if localized:
-            # Disable localization with $localization:~.
-            if self.localization is None:
-                return []
-            if 'locales' in self.localization:
-                codes = self.localization['locales'] or []
-                return locales.Locale.parse_codes(codes)
-        return self.pod.list_locales()
+        if self.localization:
+            if self.localization.get('use_podspec_locales'):
+                return self.pod.list_locales()
+            try:
+                return locales.Locale.parse_codes(self.localization['locales'])
+            except KeyError:
+                # Locales inherited from podspec.
+                podspec = self.pod.get_podspec()
+                config = podspec.get_config()
+                if ('localization' in config
+                        and 'locales' in config['localization']):
+                    identifiers = config['localization']['locales']
+                    return locales.Locale.parse_codes(identifiers)
+                raise NoLocalesError('{} has no locales.')
+        return []
 
     def to_message(self):
         message = messages.CollectionMessage()

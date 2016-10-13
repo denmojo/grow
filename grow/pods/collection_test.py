@@ -33,9 +33,7 @@ class CollectionsTestCase(unittest.TestCase):
         self.assertEqual(['col1'], [col.basename for col in collection_objs])
         pod.write_yaml('/content/col2/_blueprint.yaml', {})
         collection_objs = collection.Collection.list(pod)
-        collection_objs.sort(key=lambda col: col.basename)
-        self.assertEqual(['col1', 'col2'],
-            [col.basename for col in collection_objs])
+        self.assertEqual(['col1', 'col2'], [col.basename for col in collection_objs])
 
     def test_order(self):
         pod = testing.create_pod()
@@ -44,12 +42,11 @@ class CollectionsTestCase(unittest.TestCase):
         pod.write_yaml('/content/col-b/_blueprint.yaml', {'$order': 1})
         pod.write_yaml('/content/col-c/_blueprint.yaml', {})
         collection_objs = pod.list_collections()
+        expected_unsorted = ['col-a', 'col-b', 'col-c']
         expected_sorted = ['col-b', 'col-a', 'col-c']
-        self.assertNotEqual(
-            expected_sorted, [col.basename for col in collection_objs])
+        self.assertEqual(expected_unsorted, [col.basename for col in collection_objs])
         collection_objs.sort(key=lambda col: col.order)
-        self.assertEqual(
-            expected_sorted, [col.basename for col in collection_objs])
+        self.assertEqual(expected_sorted, [col.basename for col in collection_objs])
 
     def test_title(self):
         pod = testing.create_pod()
@@ -251,29 +248,6 @@ class CollectionsTestCase(unittest.TestCase):
         collection = pod.get_collection('pages')
         self.assertEqual(3, len(collection.docs(locale='en')))
         self.assertEqual(3, len(collection.docs(locale='de')))
-
-    def test_owns_doc_at_path(self):
-        pod = testing.create_pod()
-        pod.write_yaml('/podspec.yaml', {})
-        pod.write_yaml('/content/pages/_blueprint.yaml', {})
-        pod.write_yaml('/content/pages/page.yaml', {})
-        pod.write_yaml('/content/pages/owned/page.yaml', {})
-        pod.write_yaml('/content/pages/owned/deeper/page.yaml', {})
-        pod.write_yaml('/content/pages/sub/_blueprint.yaml', {})
-        pod.write_yaml('/content/pages/sub/page.yaml', {})
-        pod.write_yaml('/content/pages/sub/owned/page.yaml', {})
-        pod.write_yaml('/content/pages/sub/sub/_blueprint.yaml', {})
-        pod.write_yaml('/content/pages/sub/sub/page.yaml', {})
-        col = pod.get_collection('/content/pages')
-        self.assertTrue(col._owns_doc_at_path('/content/pages/page.yaml'))
-        self.assertTrue(col._owns_doc_at_path('/content/pages/owned/page.yaml'))
-        self.assertTrue(col._owns_doc_at_path('/content/pages/owned/deeper/page.yaml'))
-        self.assertFalse(col._owns_doc_at_path('/content/pages/sub/page.yaml'))
-        self.assertFalse(col._owns_doc_at_path('/content/pages/sub/owned/page.yaml'))
-        sub_col = pod.get_collection('/content/pages/sub')
-        self.assertTrue(sub_col._owns_doc_at_path('/content/pages/sub/page.yaml'))
-        self.assertTrue(sub_col._owns_doc_at_path('/content/pages/sub/owned/page.yaml'))
-        self.assertFalse(sub_col._owns_doc_at_path('/content/pages/sub/sub/page.yaml'))
 
 
 if __name__ == '__main__':

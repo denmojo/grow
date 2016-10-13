@@ -33,8 +33,6 @@ class ContentfulPreprocessor(base.BasePreprocessor):
             return field.url
         elif isinstance(field, resources.Entry):
             return field.sys['id']
-        elif isinstance(field, resources.ResourceLink):
-            return self.cda.resolve_resource_link(field)
         elif isinstance(field, list):
             return [self._parse_field(sub_field) for sub_field in field]
         return field
@@ -53,8 +51,6 @@ class ContentfulPreprocessor(base.BasePreprocessor):
             ext = 'yaml'
         if 'title' in entry.fields:
             entry.fields['$title'] = entry.fields.pop('title')
-        if 'slug' in entry.fields:
-            entry.fields['$slug'] = entry.fields.pop('slug')
         if 'category' in entry.fields:
             category = entry.fields.pop('category')
             entry.fields['$category'] = category

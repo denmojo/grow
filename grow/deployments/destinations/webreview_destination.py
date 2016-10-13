@@ -54,8 +54,7 @@ class WebReviewDestination(base.BaseDestination):
         """Returns an environment object based on the config."""
         if self.config.env:
             return env.Env(self.config.env)
-        subdomain = self._get_subdomain()
-        host = '{}-dot-{}'.format(subdomain, self.config.server)
+        host = '{}-dot-{}'.format(self.config.subdomain, self.config.server)
         config = env.EnvConfig(name='webreview', host=host, scheme='https')
         return env.Env(config)
 
@@ -63,30 +62,24 @@ class WebReviewDestination(base.BaseDestination):
     def webreview(self):
         if self._webreview is None:
             api_key = os.getenv('WEBREVIEW_API_KEY')
-            subdomain = self._get_subdomain()
             self._webreview = webreview.WebReview(
                 project=self.config.project,
-                name=subdomain,
+                name=self.config.subdomain,
                 host=self.config.server,
                 secure=self.config.secure,
                 api_key=api_key)
         return self._webreview
 
-    def _get_subdomain(self):
-        repo = common_utils.get_git_repo(self.pod.root)
-        if self.config.subdomain_prefix and not self.config.subdomain:
-            token = repo.active_branch.name.split('/')[-1]
-            if token == 'master':
-                return self.config.subdomain_prefix
-            else:
-                return self.config.subdomain_prefix + '-{}'.format(token)
-        return self.config.subdomain
-
     def deploy(self, *args, **kwargs):
         repo = kwargs.get('repo')
         if repo:
-            subdomain = self._get_subdomain()
-            self.webreview.name = subdomain
+            if self.config.subdomain_prefix and not self.config.subdomain:
+                token = repo.active_branch.name.split('/')[-1]
+                if token == 'master':
+                    subdomain = self.config.subdomain_prefix
+                else:
+                    subdomain = self.config.subdomain_prefix + '-{}'.format(token)
+                self.webreview.name = subdomain
             try:
                 self.webreview.commit = utils.create_commit_message(repo)
             except ValueError:

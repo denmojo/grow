@@ -26,6 +26,10 @@ class DocumentExistsError(Error, ValueError):
     pass
 
 
+class BadLocalesError(Error, ValueError):
+    pass
+
+
 class Document(object):
 
     def __init__(self, pod_path, _pod, locale=None, _collection=None):
@@ -37,7 +41,7 @@ class Document(object):
         self.base, self.ext = os.path.splitext(self.basename)
         self.pod = _pod
         self.collection = _collection
-        self._locale = utils.SENTINEL
+        self.locale = self._init_locale(locale, pod_path)
 
     def __repr__(self):
         if self.locale:
@@ -49,12 +53,6 @@ class Document(object):
 
     def __ne__(self, other):
         return self.pod_path != other.pod_path or self.pod != other.pod
-
-    @utils.cached_property
-    def locale(self):
-        if self._locale is utils.SENTINEL:
-            self._locale = self._init_locale(self._locale_kwarg, self.pod_path)
-        return self._locale
 
     def _init_locale(self, locale, pod_path):
         try:
@@ -90,20 +88,23 @@ class Document(object):
 
     @utils.cached_property
     def default_locale(self):
-        if (self.fields.get('$localization')
+        if ('$localization' in self.fields
             and 'default_locale' in self.fields['$localization']):
-            identifier = self.fields['$localization']['default_locale']
-            locale = locales.Locale.parse(identifier)
-            if locale:
-                locale.set_alias(self.pod)
-            return locale
-        return self.collection.default_locale
+            locale = self.fields['$localization']['default_locale']
+        elif (self.collection.localization
+              and 'default_locale' in self.collection.localization):
+            locale = self.collection.localization['default_locale']
+        else:
+            locale = self.pod.podspec.default_locale
+        locale = locales.Locale.parse(locale)
+        if locale:
+            locale.set_alias(self.pod)
+        return locale
 
     @utils.cached_property
     def fields(self):
-        identifier = self._locale_kwarg or self.collection.default_locale
         tagged_fields = self.get_tagged_fields()
-        fields = utils.untag_fields(tagged_fields, locale=str(identifier))
+        fields = utils.untag_fields(tagged_fields)
         return {} if not fields else fields
 
     def get_tagged_fields(self):
@@ -113,18 +114,6 @@ class Document(object):
     @utils.cached_property
     def format(self):
         return formats.Format.get(self)
-
-    @utils.cached_property
-    def virtual_key(self):
-        last_mod = 0
-        try:
-            last_mod = self.pod.file_modified(self.pod_path)
-        except OSError:
-            pass
-        return "{0}|{1}|{2}"\
-            .format(self.root_pod_path,
-                    self._locale_kwarg,
-                    last_mod)
 
     @property
     def url(self):
@@ -195,12 +184,13 @@ class Document(object):
     def path_format(self):
         val = None
         if (self.locale
+            and self.default_locale
             and self.locale != self.default_locale):
             if ('$localization' in self.fields
                 and 'path' in self.fields['$localization']):
                 val = self.fields['$localization']['path']
             elif self.collection.localization:
-                val = self.collection.localization.get('path')
+                val = self.collection.localization['path']
         if val is None:
             return self.fields.get('$path', self.collection.path_format)
         return val
@@ -299,16 +289,19 @@ class Document(object):
 
     @utils.cached_property
     def locales(self):
-        # Use $localization:locales if present, else use collection's locales.
         localized = '$localization' in self.fields
-        if localized:
-            localization = self.fields['$localization']
-            # Disable localization with $localization:~.
-            if localization is None:
+        if localized and 'locales' in self.fields['$localization']:
+            codes = self.fields['$localization']['locales']
+            if codes is None:
                 return []
-            if 'locales' in localization:
-                codes = localization['locales'] or []
-                return locales.Locale.parse_codes(codes)
+            return locales.Locale.parse_codes(codes)
+        if self.format.has_localized_parts:
+            document_codes = self.format._locales_from_parts
+            diff = set(document_codes) - set(self.collection.locales)
+            if diff:
+                text = '{} specified content for unconfigured locales: {}'
+                text = text.format(self, diff)
+                raise BadLocalesError(text)
         return self.collection.locales
 
     @property
